@@ -1,3 +1,9 @@
+/**
+ * My Expenses - Personal Expense Tracker
+ * Copyright (c) 2026 Sushovan Mukherjee <me@sushovan.in>
+ * Defineway Technologies Private Limited
+ * Licensed under the MIT License
+ */
 "use client"
 
 import { Button as ButtonPrimitive } from "@base-ui/react/button"

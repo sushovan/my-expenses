@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+*.key
 
 # debug
 npm-debug.log*
@@ -30,8 +31,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — NEVER commit secrets
+.env
+.env.local
+.env*.local
 
 # vercel
 .vercel
@@ -40,4 +43,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# prisma — database files (contain personal data)
 /src/generated/prisma
+prisma/*.db
+prisma/*.db-journal
+prisma/*.db-shm
+prisma/*.db-wal
+*.db
+*.db-journal
+
+# receipt uploads — may contain sensitive documents
+/uploads/
+
+# jwt keys (if using RS256 key files)
+*.private.pem
+*.public.pem

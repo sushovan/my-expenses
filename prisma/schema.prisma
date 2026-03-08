@@ -1,11 +1,180 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client"
+  provider = "prisma-client-js"
   output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "sqlite"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AccountType {
+  ASSET     // Your own bank accounts, cash in hand
+  LIABILITY // Money borrowed — e.g. "Loan from Brother-in-Law"
+  CASH      // Physical cash wallet
+}
+
+enum PaymentMethod {
+  UPI
+  BANK_TRANSFER
+  CASH
+  CHEQUE
+  CARD
+  EMI
+  OTHER
+}
+
+enum PaymentStatus {
+  UNPAID
+  PART_PAID
+  PAID
+}
+
+enum ReceiptType {
+  PHOTO
+  SCAN
+  PDF
+  OTHER
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
+  expenses     Expense[]
+  accounts     Account[]
+  categories   Category[]
+}
+
+/// Server-side session record. JWT is stored as a hash — never the raw token.
+model Session {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// SHA-256 hash of the access JWT
+  accessTokenHash   String
+  /// SHA-256 hash of the refresh token
+  refreshTokenHash  String   @unique
+  accessExpiresAt   DateTime
+  refreshExpiresAt  DateTime
+  revoked           Boolean  @default(false)
+  userAgent         String?
+  ipAddress         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+}
+
+/// Payment account — can be a bank account, cash wallet, or a liability (loan)
+model Account {
+  id          String      @id @default(cuid())
+  name        String      // e.g. "My Axis Bank", "Wife's Bandhan Account", "Loan from BIL"
+  type        AccountType
+  bankName    String?     // e.g. "Axis Bank", "Bandhan Bank"
+  notes       String?
+  isActive    Boolean     @default(true)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses    Expense[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@unique([name, userId])
+  @@index([userId])
+}
+
+/// Expense category — user-defined (Flooring, Electrical, etc.)
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  color     String?   // hex color for UI display
+  icon      String?   // icon name / emoji
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+  createdAt DateTime  @default(now())
+
+  @@unique([name, userId])
+  @@index([userId])
+}
+
+/// Core expense record
+model Expense {
+  id            String        @id @default(cuid())
+  description   String
+  payeeName     String        // Business/vendor name
+  date          DateTime
+  billedAmount  Decimal
+  paidAmount    Decimal       @default(0)
+  pendingAmount Decimal       @default(0) // billedAmount - paidAmount
+  paymentMethod PaymentMethod
+  paymentStatus PaymentStatus @default(UNPAID)
+  notes         String?
+  invoiceNumber String?
+  taxAmount     Decimal?
+  /// Phase of flat renovation: Kitchen, Bedroom, Living Room, etc.
+  projectPhase  String?
+  warrantyUntil DateTime?
+  installDate   DateTime?
+  purchaseDate  DateTime?
+  /// Vendor contact for follow-up
+  vendorPhone   String?
+  vendorEmail   String?
+  categoryId    String
+  category      Category      @relation(fields: [categoryId], references: [id])
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id])
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  receipts      Receipt[]
+  tags          ExpenseTag[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([date])
+  @@index([paymentStatus])
+}
+
+/// Receipt / attachment linked to an expense
+model Receipt {
+  id            String      @id @default(cuid())
+  expenseId     String
+  expense       Expense     @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  fileName      String      // UUID-renamed stored filename
+  originalName  String      // Original file name from user
+  filePath      String      // Relative path from uploads dir
+  thumbnailPath String?     // Compressed preview path
+  mimeType      String
+  sizeBytes     Int
+  receiptType   ReceiptType @default(PHOTO)
+  capturedAt    DateTime    @default(now())
+
+  @@index([expenseId])
+}
+
+/// Tag for flexible labelling of expenses
+model Tag {
+  id       String       @id @default(cuid())
+  name     String       @unique
+  expenses ExpenseTag[]
+}
+
+/// Many-to-many join between Expense and Tag
+model ExpenseTag {
+  expenseId String
+  tagId     String
+  expense   Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([expenseId, tagId])
 }
